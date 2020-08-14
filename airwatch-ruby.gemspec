@@ -9,9 +9,10 @@ Gem::Specification.new do |spec|
   spec.authors       = ["Dave Schukin"]
   spec.email         = ["daveschukin@gmail.com"]
 
-  spec.summary       = %q{Ruby wrapper around AirWatch REST API.}
+  spec.summary       = %q{Ruby wrapper around AirWatch REST API}
   spec.description   = %q{Ruby wrapper around AirWatch REST API.}
   spec.homepage      = "https://www.github.com/observantlabs/airwatch-ruby"
+  spec.license       = 'MIT'
 
   # Prevent pushing this gem to RubyGems.org. To allow pushes either set the 'allowed_push_host'
   # to allow pushing to a single host or delete this section to allow pushing to any host.
