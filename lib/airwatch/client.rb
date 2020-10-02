@@ -1,3 +1,7 @@
+require 'httparty'
+require 'addressable'
+require 'rest-client'
+
 module Airwatch
   class Client
   	# @param [String] host make sure you get this from Settings > System > Advanced > Site URLs
@@ -33,6 +37,50 @@ module Airwatch
 
 	def install_internal_app(app_id, device_id)
 		post("mam/apps/internal/#{app_id}/install", { deviceid: device_id })
+	end
+
+	def upload_blob(file_path, org_group_id)
+		raise "No IPA found at path: #{file_path}" unless File.file?(file_path)
+		filename = File.basename(file_path)
+		url = build_url('mam/blobs/uploadblob', { filename: filename, organizationgroupid: org_group_id.to_s })
+		payload = File.open(file_path, 'rb')
+		headers = request_headers
+		headers[:'Content-Type'] = 'application/octet-stream'
+		headers[:'Expect'] = '100-continue'
+		response = nil
+		begin
+			response = RestClient::Request.execute(
+				:url => url,
+				:method => :post,
+				:headers => headers,
+				:payload => File.open(file_path, 'rb')
+			)
+		rescue RestClient::BadRequest => e
+			puts "Error uploading blob"
+			puts "Exception message: ---------"
+			puts e.message
+			puts "HTTP status code: ---------"
+			puts e.http_code
+			puts "HTTP body: ---------"
+			puts e.http_body
+			return nil
+		end
+		JSON.parse(response)
+	end
+
+	def begin_install(blob_id, app_name, org_group_id)
+		supportedmodels = {'Model' => [{'ModelId' => 1,'ModelName' => 'iPhone'},{'ModelId' => 2,'ModelName' => 'iPad'},{'ModelId' => 3,'ModelName' => 'iPod Touch'}]}
+		params = { 
+			'BlobId' => blob_id,
+			'DeviceType' => 'Apple', # 'Apple', 
+			'ApplicationName' => app_name, 
+			'AppVersion' => nil, 
+			'SupportedModels' => supportedmodels, 
+			'PushMode' => 'On Demand',
+			'LocationGroupId' => org_group_id
+		}
+		url = build_url('mam/apps/internal/begininstall')
+		post('mam/apps/internal/begininstall', params.to_json)
 	end
 
 	#############################
@@ -90,6 +138,20 @@ module Airwatch
 		get("mdm/smartgroups/#{smart_group_id}")
 	end
 
+	def smart_group_update(smart_group_id, device_addition_ids:)
+		raise 'need to assign to at least 1 device' if device_addition_ids.empty?
+		device_additions = device_addition_ids.map { |id| { id: id } }
+		put("mdm/smartgroups/#{smart_group_id}", { criteriatype: 'UserDevice', deviceadditions: device_additions }.to_json)
+	end
+
+	def add_smart_group_assignment_to_app(smart_group_id, app_id)
+		post("mam/apps/internal/#{app_id}/smartgroups/#{smart_group_id}")
+	end
+
+	def remove_smart_group_asignment_from_app(smart_group_id, app_id)
+		delete("mam/apps/internal/#{app_id}/smartgroups/#{smart_group_id}")
+	end
+
 	#############################
 	# Devices           		#
 	#############################
@@ -112,6 +174,16 @@ module Airwatch
 		end
 
 		get('mdm/devices/profiles', params)
+	end
+
+	def search_devices(serial_number: nil)
+		params = {}
+
+		unless serial_number.nil?
+			params[:serialnumber] = serial_number
+		end
+
+		get('mdm/devices', params)
 	end
 
 	#############################
@@ -143,27 +215,12 @@ module Airwatch
 		puts JSON.pretty_generate(response.parsed_response)
 	end
 
-	def upload_blob(file_path, org_group_id)
-		raise "No IPA found at path: #{file_path}" unless File.file?(file_path)
-		filename = File.basename(file_path)
-		url = build_url('mam/blobs/uploadblob', { filename: filename, organizationgroupid: org_group_id })
-		payload = File.open(file_path, 'rb')
-		headers = request_headers
-		headers[:'Content-Type'] = 'application/octet-stream'
-		headers[:'Expect'] = '100-continue'
-		response = RestClient::Request.execute(
-			:url => url,
-			:method => :post,
-			:headers => headers,
-			:payload => File.open(file_path, 'rb')
-		)
-	end
-
 	# private
 	def request_headers
 		{
 			'aw-tenant-code': @api_key,
 			'Accept': 'application/json',
+			'Content-Type': 'application/json',
 			'Authorization': @authorization
 		}
 	end
