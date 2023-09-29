@@ -76,7 +76,6 @@ module Airwatch
 			'ApplicationName' => app_name, 
 			'AppVersion' => nil, 
 			'SupportedModels' => supportedmodels, 
-			'PushMode' => 'On Demand',
 			'LocationGroupId' => org_group_id
 		}
 		url = build_url('mam/apps/internal/begininstall')
